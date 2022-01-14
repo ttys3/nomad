@@ -245,7 +245,7 @@ export default class IndexController extends Controller.extend(Sortable, Searcha
 
   @action
   gotoJob(job) {
-    this.transitionToRoute('jobs.job', job.get('plainId'), {
+    this.transitionToRoute('jobs.job', job, {
       queryParams: { namespace: job.get('namespace.name') },
     });
   }
