@@ -46,7 +46,7 @@ module('Acceptance | volume detail', function(hooks) {
   });
 
   test('/csi/volumes/:id should show the volume name in the title', async function(assert) {
-    await VolumeDetail.visit({ id: volume.id });
+    await VolumeDetail.visit({ id: `${volume.id}@default` });
 
     assert.equal(document.title, `CSI Volume ${volume.name} - Nomad`);
     assert.equal(VolumeDetail.title, volume.name);

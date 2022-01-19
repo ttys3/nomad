@@ -11,15 +11,15 @@ import classic from 'ember-classic-decorator';
 
 @classic
 export default class IndexController extends Controller.extend(
-    SortableFactory([
-      'id',
-      'schedulable',
-      'controllersHealthyProportion',
-      'nodesHealthyProportion',
-      'provider',
-    ]),
-    Searchable
-  ) {
+  SortableFactory([
+    'id',
+    'schedulable',
+    'controllersHealthyProportion',
+    'nodesHealthyProportion',
+    'provider',
+  ]),
+  Searchable
+) {
   @service system;
   @service userSettings;
   @controller('csi/volumes') volumesController;
@@ -112,10 +112,7 @@ export default class IndexController extends Controller.extend(
   @action
   gotoVolume(volume, event) {
     lazyClick([
-      () =>
-        this.transitionToRoute('csi.volumes.volume', volume.get('plainId'), {
-          queryParams: { volumeNamespace: volume.get('namespace.name') },
-        }),
+      () => this.transitionToRoute('csi.volumes.volume', volume.get('idWithNamespace')),
       event,
     ]);
   }
