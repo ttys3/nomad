@@ -1,0 +1,13 @@
+.sidebar {
+  position: absolute;
+  background: blue;
+  height: 100%;
+  right: 0px;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+  transform: translateX(100%);
+  visibility: hidden;
+  &.pib {
+    visibility: visible;
+  }
+}

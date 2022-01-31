@@ -2,9 +2,43 @@ import Controller from '@ember/controller';
 import { action } from '@ember/object';
 import { tracked } from '@glimmer/tracking';
 import { inject as service } from '@ember/service';
+import { matchesState, useMachine } from 'ember-statecharts';
+import { use } from 'ember-usable';
+import evaluationsMachine from '../../machines/evaluations';
 
 export default class EvaluationsController extends Controller {
   @service userSettings;
+  @service store;
+
+  @matchesState({ sidebar: { open: 'success' } })
+  isSideBarOpen;
+
+  @use statechart = useMachine(evaluationsMachine).withConfig({
+    services: {
+      loadEvaluation: this.loadEvaluation,
+    },
+    action: {
+      updateQueryParameters: this.updateQueryParameters,
+    },
+  });
+
+  @action
+  async loadEvaluation(context, { evaluation }) {
+    // set query parameters
+    // open modal, set evaluationID
+    return this.store.findRecord('evaluation', evaluation.id, { reload: true });
+  }
+
+  @action
+  closeSidebar() {
+    return this.statechart.send('MODAL_CLOSE');
+  }
+
+  @action
+  async handleEvaluationClick(evaluation, event) {
+    this.statechart.send('MODAL_OPEN', { evaluation });
+    event.stopPropagation();
+  }
 
   queryParams = ['nextToken', 'pageSize', 'status'];
 
@@ -31,6 +65,7 @@ export default class EvaluationsController extends Controller {
   @tracked nextToken = null;
   @tracked previousTokens = [];
   @tracked status = null;
+  @tracked isShown = false;
 
   @action
   onChange(newPageSize) {
