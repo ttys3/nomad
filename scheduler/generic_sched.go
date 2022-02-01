@@ -43,6 +43,12 @@ const (
 	// allocRescheduled is the status used when an allocation failed and was rescheduled
 	allocRescheduled = "alloc was rescheduled because it failed"
 
+	// allocUnknown is the status used when the node the allocations is on has
+	// failed its heartbeat grace period, but is configured to resume after the
+	// client reconnects. Resuming means that healthy, running allocations on the
+	// reconnecting client should re-attach rather than stop and restart.
+	allocUnknown = "alloc is unknown since its node is unknown"
+
 	// blockedEvalMaxPlanDesc is the description used for blocked evals that are
 	// a result of hitting the max number of plan attempts
 	blockedEvalMaxPlanDesc = "created due to placement conflicts"
@@ -342,9 +348,9 @@ func (s *GenericScheduler) computeJobAllocs() error {
 	}
 
 	// Determine the tainted nodes containing job allocs
-	tainted, err := taintedNodes(s.state, allocs)
+	tainted, unknown, err := taintedAndUnknownNodes(s.state, allocs)
 	if err != nil {
-		return fmt.Errorf("failed to get tainted nodes for job '%s': %v",
+		return fmt.Errorf("failed to get tainted and unknown nodes for job '%s': %v",
 			s.eval.JobID, err)
 	}
 
@@ -354,7 +360,7 @@ func (s *GenericScheduler) computeJobAllocs() error {
 
 	reconciler := NewAllocReconciler(s.logger,
 		genericAllocUpdateFn(s.ctx, s.stack, s.eval.ID),
-		s.batch, s.eval.JobID, s.job, s.deployment, allocs, tainted, s.eval.ID, s.eval.Priority)
+		s.batch, s.eval.JobID, s.job, s.deployment, allocs, tainted, unknown, s.eval.ID, s.eval.Priority)
 	results := reconciler.Compute()
 	s.logger.Debug("reconciled current state with desired state", "results", log.Fmt("%#v", results))
 
@@ -399,9 +405,14 @@ func (s *GenericScheduler) computeJobAllocs() error {
 		s.ctx.Plan().AppendAlloc(update, nil)
 	}
 
+	// Handle reconnect updates
+	for _, update := range results.reconnectUpdates {
+		s.ctx.Plan().AppendAlloc(update, nil)
+	}
+
 	// Nothing remaining to do if placement is not required
 	if len(results.place)+len(results.destructiveUpdate) == 0 {
-		// If the job has been purged we don't have access to the job. Otherwise
+		// If the job has been purged we don't have access to the job. Otherwise,
 		// set the queued allocs to zero. This is true if the job is being
 		// stopped as well.
 		if s.job != nil {

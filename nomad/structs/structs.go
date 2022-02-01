@@ -1698,16 +1698,17 @@ func (ne *NodeEvent) AddDetail(k, v string) *NodeEvent {
 }
 
 const (
-	NodeStatusInit  = "initializing"
-	NodeStatusReady = "ready"
-	NodeStatusDown  = "down"
+	NodeStatusInit    = "initializing"
+	NodeStatusReady   = "ready"
+	NodeStatusDown    = "down"
+	NodeStatusUnknown = "unknown"
 )
 
 // ShouldDrainNode checks if a given node status should trigger an
 // evaluation. Some states don't require any further action.
 func ShouldDrainNode(status string) bool {
 	switch status {
-	case NodeStatusInit, NodeStatusReady:
+	case NodeStatusInit, NodeStatusReady, NodeStatusUnknown:
 		return false
 	case NodeStatusDown:
 		return true
@@ -1719,7 +1720,7 @@ func ShouldDrainNode(status string) bool {
 // ValidNodeStatus is used to check if a node status is valid
 func ValidNodeStatus(status string) bool {
 	switch status {
-	case NodeStatusInit, NodeStatusReady, NodeStatusDown:
+	case NodeStatusInit, NodeStatusReady, NodeStatusDown, NodeStatusUnknown:
 		return true
 	default:
 		return false
@@ -9325,6 +9326,7 @@ const (
 	AllocClientStatusComplete = "complete"
 	AllocClientStatusFailed   = "failed"
 	AllocClientStatusLost     = "lost"
+	AllocClientStatusUnknown  = "unknown"
 )
 
 // Allocation is used to allocate the placement of a task group to a node.
@@ -9746,6 +9748,28 @@ func (a *Allocation) WaitClientStop() time.Time {
 	}
 
 	return t.Add(*tg.StopAfterClientDisconnect + kill)
+}
+
+// ResumeTimeout uses the ResumeOnClientAfterReconnect to block rescheduling until
+// the interval passes
+func (a *Allocation) ResumeTimeout(node *Node, now time.Time) time.Time {
+	tg := a.Job.LookupTaskGroup(a.TaskGroup)
+
+	// Prefer the duration from the task group.
+	timeout := tg.ResumeAfterClientDisconnect
+	// If not configured on the task group, try the client.
+	if timeout == nil {
+		timeout = node.ResumeAfterClientDisconnect
+	}
+
+	// If not configured, return now
+	if timeout == nil {
+		timeout = now
+	} else {
+
+	}
+
+	return timeout
 }
 
 // NextDelay returns a duration after which the allocation can be rescheduled.
@@ -10391,6 +10415,7 @@ const (
 	EvalTriggerQueuedAllocs      = "queued-allocs"
 	EvalTriggerPreemption        = "preemption"
 	EvalTriggerScaling           = "job-scaling"
+	EvalTriggerResumeTimeout     = "resume-timeout"
 )
 
 const (

@@ -348,32 +348,48 @@ func progressMade(result *structs.PlanResult) bool {
 		len(result.DeploymentUpdates) != 0)
 }
 
-// taintedNodes is used to scan the allocations and then check if the
+// taintedAndUnknownNodes is used to scan the allocations and then check if the
 // underlying nodes are tainted, and should force a migration of the allocation.
-// All the nodes returned in the map are tainted.
-func taintedNodes(state State, allocs []*structs.Allocation) (map[string]*structs.Node, error) {
-	out := make(map[string]*structs.Node)
+// All the nodes returned in the first map are tainted.
+// All teh nodes returned in teh second map are unknown.
+func taintedAndUnknownNodes(state State, allocs []*structs.Allocation) (map[string]*structs.Node, map[string]*structs.Node, error) {
+	tainted := make(map[string]*structs.Node)
+	unknown := make(map[string]*structs.Node)
+
 	for _, alloc := range allocs {
-		if _, ok := out[alloc.NodeID]; ok {
+		// If already found in either map, continue
+		if _, ok := tainted[alloc.NodeID]; ok {
+			continue
+		}
+		if _, ok := unknown[alloc.NodeID]; ok {
 			continue
 		}
 
+		// Lookup the node
 		ws := memdb.NewWatchSet()
 		node, err := state.NodeByID(ws, alloc.NodeID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// If the node does not exist, we should migrate
 		if node == nil {
-			out[alloc.NodeID] = nil
+			tainted[alloc.NodeID] = nil
 			continue
 		}
+
+		// If the node is a drain target, add to tainted set.
 		if structs.ShouldDrainNode(node.Status) || node.DrainStrategy != nil {
-			out[alloc.NodeID] = node
+			tainted[alloc.NodeID] = node
+		}
+
+		// If the node is in the unknown state, add to the unknown set.
+		if node.Status == structs.NodeStatusUnknown {
+			unknown[alloc.NodeID] = node
 		}
 	}
-	return out, nil
+
+	return tainted, unknown, nil
 }
 
 // shuffleNodes randomizes the slice order with the Fisher-Yates algorithm
